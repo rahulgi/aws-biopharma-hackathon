@@ -23,6 +23,11 @@ import {
   presetToInput,
   type DrugPreset,
 } from "@/lib/catalog";
+import {
+  readRunHistory,
+  saveRunToHistory,
+  type SavedAgentRun,
+} from "@/lib/run-history";
 import { consumeSse } from "@/lib/sse";
 
 type RunPhase = "idle" | "running" | "success" | "error";
@@ -168,6 +173,17 @@ function formatClock(durationMs: number): string {
   return `${minutes.toString().padStart(2, "0")}:${seconds
     .toString()
     .padStart(2, "0")}`;
+}
+
+function formatSavedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Saved run";
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function safeHostname(url: string): string {
@@ -368,6 +384,9 @@ export function PharmaContentDemo() {
   const [error, setError] = useState("");
   const [runId, setRunId] = useState("");
   const [isPreview, setIsPreview] = useState(false);
+  const [executedInput, setExecutedInput] = useState<AgentInput | null>(null);
+  const [runHistory, setRunHistory] = useState<SavedAgentRun[]>([]);
+  const [historyNotice, setHistoryNotice] = useState("");
   const [activeAudience, setActiveAudience] = useState<AudienceKey>("medical");
   const [deliverableView, setDeliverableView] =
     useState<DeliverableView>("grounded");
@@ -376,6 +395,7 @@ export function PharmaContentDemo() {
   const controllerRef = useRef<AbortController | null>(null);
   const resultRef = useRef<AgentRunResult | null>(null);
   const errorRef = useRef("");
+  const runHistoryRef = useRef<SavedAgentRun[]>([]);
 
   const input = useMemo<AgentInput>(() => {
     const usePresetSources = selectedPreset?.drug === drug;
@@ -390,6 +410,20 @@ export function PharmaContentDemo() {
         : {}),
     };
   }, [drug, indication, question, selectedPreset]);
+  const activeInput = executedInput ?? input;
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      try {
+        const savedRuns = readRunHistory(window.localStorage);
+        runHistoryRef.current = savedRuns;
+        setRunHistory(savedRuns);
+      } catch {
+        // Browser privacy settings can disable local storage entirely.
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     if (phase !== "running" || startedAt === null) return;
@@ -419,6 +453,8 @@ export function PharmaContentDemo() {
     setError("");
     setRunId("");
     setIsPreview(false);
+    setExecutedInput(null);
+    setHistoryNotice("");
     setStartedAt(null);
     setElapsed(0);
     setActiveAudience("medical");
@@ -434,12 +470,32 @@ export function PharmaContentDemo() {
     setQuestion(next.medical_information_question ?? "");
   };
 
-  const startRun = async () => {
-    if (!input.drug || !input.indication || phase === "running") return;
+  const setFormInput = (nextInput: AgentInput) => {
+    const matchingPreset = DRUG_PRESETS.find(
+      (preset) => preset.drug === nextInput.drug,
+    );
+    setSelectedPreset(matchingPreset ?? initialPreset);
+    setDrug(nextInput.drug);
+    setIndication(nextInput.indication);
+    setQuestion(nextInput.medical_information_question ?? "");
+  };
+
+  const startRun = async (requestedInput: AgentInput = input) => {
+    if (
+      !requestedInput.drug ||
+      !requestedInput.indication ||
+      phase === "running"
+    ) {
+      return;
+    }
     const controller = new AbortController();
+    let responseRunId = "";
+    let previewRun = false;
     controllerRef.current = controller;
     resultRef.current = null;
     errorRef.current = "";
+    setFormInput(requestedInput);
+    setExecutedInput(requestedInput);
     setPhase("running");
     setSpans([]);
     setRunResult(null);
@@ -448,6 +504,7 @@ export function PharmaContentDemo() {
     setError("");
     setRunId("");
     setIsPreview(false);
+    setHistoryNotice("");
     setStartedAt(Date.now());
     setElapsed(0);
 
@@ -461,7 +518,7 @@ export function PharmaContentDemo() {
       const response = await fetch("/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
+        body: JSON.stringify(requestedInput),
         signal: controller.signal,
       });
       if (!response.ok) {
@@ -471,7 +528,10 @@ export function PharmaContentDemo() {
         throw new Error(body?.error || "The analysis could not start.");
       }
       if (!response.body) throw new Error("The run stream was empty.");
-      if (response.headers.get("x-demo-preview") === "true") setIsPreview(true);
+      if (response.headers.get("x-demo-preview") === "true") {
+        previewRun = true;
+        setIsPreview(true);
+      }
 
       await consumeSse(response.body, ({ event, data }) => {
         const payload =
@@ -479,8 +539,14 @@ export function PharmaContentDemo() {
             ? (data as Record<string, unknown>)
             : {};
         if (event === "start") {
-          if (typeof payload.runId === "string") setRunId(payload.runId);
-          if (payload.preview === true) setIsPreview(true);
+          if (typeof payload.runId === "string") {
+            responseRunId = payload.runId;
+            setRunId(payload.runId);
+          }
+          if (payload.preview === true) {
+            previewRun = true;
+            setIsPreview(true);
+          }
         }
         if (
           event === "span" &&
@@ -523,6 +589,33 @@ export function PharmaContentDemo() {
         setPhase("error");
       } else if (settledResult) {
         setPhase("success");
+        const savedAt = new Date().toISOString();
+        let saved = { history: runHistoryRef.current, saved: false };
+        try {
+          saved = saveRunToHistory(
+            window.localStorage,
+            {
+              id:
+                responseRunId ||
+                `${savedAt}-${settledResult.agentVersionId ?? "run"}`,
+              savedAt,
+              runId: responseRunId,
+              input: requestedInput,
+              result: settledResult,
+              isPreview: previewRun,
+            },
+            runHistoryRef.current,
+          );
+        } catch {
+          // Keep the completed result visible when storage is unavailable.
+        }
+        runHistoryRef.current = saved.history;
+        setRunHistory(saved.history);
+        setHistoryNotice(
+          saved.saved
+            ? "Saved in this browser"
+            : "This result was too large for browser history",
+        );
       } else {
         throw new Error("The run ended before a result was returned.");
       }
@@ -541,6 +634,33 @@ export function PharmaContentDemo() {
         startedAt === null ? current : Date.now() - startedAt,
       );
     }
+  };
+
+  const restoreSavedRun = (saved: SavedAgentRun) => {
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+    resultRef.current = saved.result;
+    errorRef.current = "";
+    setFormInput(saved.input);
+    setExecutedInput(saved.input);
+    setPhase("success");
+    setSpans(saved.result.trace ?? []);
+    setRunResult(saved.result);
+    setOutput(parseApprovedContentOutput(saved.result.output));
+    setStreamedOutput("");
+    setError("");
+    setRunId(saved.runId);
+    setIsPreview(saved.isPreview);
+    setStartedAt(null);
+    setElapsed(saved.result.durationMs);
+    setHistoryNotice(`Restored from ${formatSavedAt(saved.savedAt)}`);
+    setActiveAudience("medical");
+    setDeliverableView("grounded");
+    window.setTimeout(() => {
+      document
+        .getElementById("live-work")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
   };
 
   const selectedText =
@@ -575,10 +695,10 @@ export function PharmaContentDemo() {
   const sourceRegister = useMemo(() => {
     const urls = output?.sourceUrls.length
       ? output.sourceUrls
-      : (input.approved_sources?.map((source) => source.url) ?? []);
+      : (activeInput.approved_sources?.map((source) => source.url) ?? []);
     const categories = output?.sourceCategories.length
       ? output.sourceCategories
-      : (input.approved_sources?.map((source) => source.category) ?? []);
+      : (activeInput.approved_sources?.map((source) => source.category) ?? []);
     const count = Math.max(
       output?.sourceCount ?? 0,
       urls.length,
@@ -591,7 +711,7 @@ export function PharmaContentDemo() {
       url: urls[index] ?? "",
       category: categories[index],
     }));
-  }, [input.approved_sources, output]);
+  }, [activeInput.approved_sources, output]);
 
   const isLiveSurface = phase !== "idle";
   const finalDuration = runResult?.durationMs ?? elapsed;
@@ -732,21 +852,93 @@ export function PharmaContentDemo() {
             <span className="active-run-label">
               {phase === "running" ? "Analysis in progress" : "Analysis run"}
             </span>
-            <h2>{input.drug}</h2>
-            <p>{input.indication}</p>
-            <div>
+            <h2>{activeInput.drug}</h2>
+            <p>{activeInput.indication}</p>
+            <div className="active-run-metrics">
               <span>{formatClock(finalDuration)}</span>
               <span>
                 {completedStageCount}/{STAGES.length} stages
               </span>
               {runId && <span>Run {runId.slice(0, 8)}</span>}
             </div>
-            <button className="secondary-button" onClick={reset} type="button">
-              <Icon name="refresh" size={16} /> New analysis
-            </button>
+            {historyNotice && (
+              <p className="history-notice">
+                <Icon name="database" size={14} /> {historyNotice}
+              </p>
+            )}
+            <div className="active-run-actions">
+              <button
+                className="secondary-button"
+                onClick={reset}
+                type="button"
+              >
+                New analysis
+              </button>
+              {phase !== "running" && (
+                <button
+                  className="rerun-button"
+                  onClick={() => void startRun(activeInput)}
+                  type="button"
+                >
+                  <Icon name="refresh" size={16} /> Run against latest agent
+                </button>
+              )}
+            </div>
           </aside>
         )}
       </section>
+
+      {phase === "idle" && runHistory.length > 0 && (
+        <section className="history-section" aria-labelledby="run-history">
+          <div className="history-heading">
+            <div>
+              <span className="section-kicker">Saved on this browser</span>
+              <h2 id="run-history">Previous analyses</h2>
+            </div>
+            <p>
+              View a saved result without spending another run, or submit its
+              input to the latest published agent.
+            </p>
+          </div>
+          <div className="history-list">
+            {runHistory.map((saved) => (
+              <article className="history-row" key={saved.id}>
+                <span className="history-icon">
+                  <Icon name="file" size={18} />
+                </span>
+                <div className="history-copy">
+                  <h3>{saved.input.drug}</h3>
+                  <p>{saved.input.indication}</p>
+                  <span>
+                    {formatSavedAt(saved.savedAt)} ·{" "}
+                    {formatDuration(saved.result.durationMs)}
+                    {saved.result.versionLabel
+                      ? ` · ${saved.result.versionLabel}`
+                      : ""}
+                    {saved.isPreview ? " · Preview" : ""}
+                  </span>
+                </div>
+                <div className="history-actions">
+                  <button
+                    className="secondary-button"
+                    onClick={() => restoreSavedRun(saved)}
+                    type="button"
+                  >
+                    View saved result
+                  </button>
+                  <button
+                    className="rerun-button"
+                    onClick={() => void startRun(saved.input)}
+                    type="button"
+                  >
+                    <Icon name="refresh" size={15} /> Run latest
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       {isLiveSurface && (
         <>
@@ -989,7 +1181,7 @@ export function PharmaContentDemo() {
                           className="icon-button"
                           onClick={() =>
                             downloadText(
-                              `${input.drug
+                              `${activeInput.drug
                                 .toLowerCase()
                                 .replace(
                                   /[^a-z0-9]+/g,

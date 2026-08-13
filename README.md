@@ -4,6 +4,8 @@ A standalone Next.js hackathon demo for the Cemented v3 approved-content agent. 
 
 Each audience opens on a grounded outline. Verbatim passages verified against the retained corpus carry Cemented's green underline treatment and link to the native full-evidence audit view; a clean-draft toggle removes the evidence annotation for downstream review.
 
+Successful runs are saved in that browser's local storage, including their inputs, traces, outputs, and formatted HTML artifacts. The history list can restore a result without invoking the agent, while its explicit **Run latest** action submits the same saved input to the latest published version.
+
 The app is intentionally separate from the main Cemented application and can be deployed to Vercel from this directory.
 
 ## What it consumes
@@ -26,7 +28,7 @@ type Input = {
 };
 ```
 
-The output parser reads the agent's three `*_TEXT` fields, Medical Information artifact metadata, source audit fields, and verified snippet count. It ignores additional fields so the agent can keep evolving without breaking the demo.
+The output parser reads the agent's three `*_TEXT` fields, audience-specific artifact filenames, source audit fields, and verified snippet count. It ignores additional fields so the agent can keep evolving without breaking the demo.
 
 ## Published agent
 
@@ -87,4 +89,5 @@ npm run build
 - Other autocomplete choices omit approved URLs. The agent discovers candidates and the UI labels them as pending source approval.
 - A span is upserted by `span.id`, so its settled `done` or `error` event replaces its earlier `running` event.
 - The workflow groups the agent's detailed nodes for presentation while retaining real labels and timing in the activity ticker.
-- Returned HTML artifacts stay in the browser as base64 until the visitor opens or downloads them.
+- Returned HTML artifacts stay in the browser as base64 until the visitor opens or downloads them, and are retained with browser-local run history when quota permits.
+- Run history is device- and browser-specific. It keeps up to eight recent results and drops older entries first if browser storage is full.
