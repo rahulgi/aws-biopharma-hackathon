@@ -1393,6 +1393,108 @@ summary:focus-visible {
   text-align: center;
 }
 
+.brand-logo-strip {
+  background: #102f2c;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: white;
+  padding: 34px 52px;
+}
+
+.brand-logo-inner {
+  align-items: center;
+  display: flex;
+  gap: clamp(30px, 6vw, 90px);
+  justify-content: space-between;
+  margin: 0 auto;
+  max-width: 1276px;
+}
+
+.brand-logo-label {
+  color: rgba(255, 255, 255, 0.56);
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.brand-logo-list {
+  align-items: center;
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
+  max-width: 760px;
+}
+
+.brand-logo-list a {
+  align-items: center;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  color: white;
+  display: flex;
+  justify-content: center;
+  min-height: 52px;
+  opacity: 0.78;
+  padding: 6px clamp(22px, 4vw, 52px);
+  text-decoration: none;
+  transition: opacity 150ms ease;
+}
+
+.brand-logo-list a:hover {
+  opacity: 1;
+}
+
+.partner-wordmark {
+  align-items: center;
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+.partner-wordmark strong {
+  font-weight: 600;
+}
+
+.codex-wordmark {
+  font-size: 23px;
+  letter-spacing: -0.045em;
+}
+
+.convoke-wordmark {
+  font-family: var(--serif);
+  font-size: 23px;
+  gap: 9px;
+  letter-spacing: -0.045em;
+}
+
+.convoke-wordmark svg {
+  fill: none;
+  height: 24px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  width: 50px;
+}
+
+.aws-wordmark svg {
+  height: 38px;
+  overflow: visible;
+  width: 82px;
+}
+
+.aws-wordmark text {
+  fill: currentColor;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -2px;
+}
+
+.aws-wordmark path {
+  fill: none;
+  stroke: #ff9900;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.3;
+}
+
 .sources-section {
   padding-bottom: 92px;
   padding-top: 82px;
@@ -1559,6 +1661,11 @@ footer p {
     padding-right: 28px;
   }
 
+  .brand-logo-strip {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
   .hero {
     gap: 45px;
     grid-template-columns: 1fr;
@@ -1625,8 +1732,39 @@ footer p {
     gap: 8px;
   }
 
-  .prototype-badge {
-    display: none;
+  .brand-logo-strip {
+    padding: 27px 18px;
+  }
+
+  .brand-logo-inner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 17px;
+  }
+
+  .brand-logo-list {
+    max-width: none;
+    width: 100%;
+  }
+
+  .brand-logo-list a {
+    min-width: 0;
+    padding: 5px 9px;
+  }
+
+  .codex-wordmark,
+  .convoke-wordmark {
+    font-size: 17px;
+  }
+
+  .convoke-wordmark svg {
+    height: 18px;
+    width: 37px;
+  }
+
+  .aws-wordmark svg {
+    height: 31px;
+    width: 67px;
   }
 
   .agent-status {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Icon, type IconName } from "./icon";
+import { BrandLogoStrip } from "./brand-logos";
 import { GroundedOutline } from "./grounded-outline";
 import { MarkdownDocument } from "./markdown-document";
 import {
@@ -1093,6 +1094,8 @@ export function PharmaContentDemo() {
           )}
         </>
       )}
+
+      <BrandLogoStrip />
 
       <footer>
         <BrandMark />
