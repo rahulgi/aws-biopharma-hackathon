@@ -7,6 +7,7 @@ import { BrandLogoStrip } from "./brand-logos";
 import { GroundedOutline } from "./grounded-outline";
 import { MarkdownDocument } from "./markdown-document";
 import {
+  artifactByFilename,
   parseApprovedContentOutput,
   upsertSpan,
   type AgentInput,
@@ -560,10 +561,15 @@ export function PharmaContentDemo() {
   const fullEvidenceUrl = selectedReport
     ? `https://www.cemented.ai/v3/research/${encodeURIComponent(selectedReport.requestId)}`
     : null;
-  const htmlArtifact = runResult?.artifacts?.find(
-    (artifact) =>
-      artifact.contentType.includes("html") ||
-      artifact.filename.endsWith(".html"),
+  const selectedDocumentFilename =
+    activeAudience === "medical"
+      ? (output?.medicalInformationDocumentFilename ?? "")
+      : activeAudience === "msl"
+        ? (output?.mslDocumentFilename ?? "")
+        : (output?.salesDocumentFilename ?? "");
+  const selectedArtifact = artifactByFilename(
+    runResult?.artifacts,
+    selectedDocumentFilename,
   );
 
   const sourceRegister = useMemo(() => {
@@ -889,14 +895,14 @@ export function PharmaContentDemo() {
                     </span>
                     <h2>Three drafts from the same evidence</h2>
                   </div>
-                  {htmlArtifact && (
+                  {selectedArtifact && (
                     <button
                       className="artifact-button"
-                      onClick={() => openArtifact(htmlArtifact)}
+                      onClick={() => openArtifact(selectedArtifact)}
                       type="button"
                     >
-                      <Icon name="external" size={16} /> Open formatted MI
-                      document
+                      <Icon name="external" size={16} /> Open formatted{" "}
+                      {selectedAudience.label} document
                     </button>
                   )}
                 </div>

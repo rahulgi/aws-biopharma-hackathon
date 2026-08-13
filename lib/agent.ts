@@ -71,8 +71,12 @@ export type ApprovedContentOutput = {
   medicalInformationPopulatedSectionCount: number;
   mslReport: GroundedReportRef | null;
   mslText: string;
+  mslDocumentFilename: string;
+  mslPopulatedSectionCount: number;
   salesReport: GroundedReportRef | null;
   salesText: string;
+  salesDocumentFilename: string;
+  salesPopulatedSectionCount: number;
   sourceMode: "CALLER_SUPPLIED" | "DISCOVERED_CANDIDATES" | "UNKNOWN";
   sourceCount: number;
   sourceTitles: string[];
@@ -162,8 +166,12 @@ export function parseApprovedContentOutput(
     ),
     mslReport: groundedReportRef(raw.MSL_ANALYSIS),
     mslText: stringValue(raw.MSL_ANALYSIS_TEXT),
+    mslDocumentFilename: stringValue(raw.MSL_DOCUMENT_FILENAME),
+    mslPopulatedSectionCount: numberValue(raw.MSL_POPULATED_SECTION_COUNT),
     salesReport: groundedReportRef(raw.SALES_ANALYSIS),
     salesText: stringValue(raw.SALES_ANALYSIS_TEXT),
+    salesDocumentFilename: stringValue(raw.SALES_DOCUMENT_FILENAME),
+    salesPopulatedSectionCount: numberValue(raw.SALES_POPULATED_SECTION_COUNT),
     sourceMode,
     sourceCount: numberValue(raw.SOURCE_COUNT),
     sourceTitles: stringArray(raw.SOURCE_TITLES),
@@ -174,6 +182,14 @@ export function parseApprovedContentOutput(
     verifiedSnippetCount: numberValue(raw.VERIFIED_SNIPPET_COUNT),
     raw,
   };
+}
+
+export function artifactByFilename(
+  artifacts: RunArtifact[] | undefined,
+  filename: string,
+): RunArtifact | undefined {
+  if (!filename) return undefined;
+  return artifacts?.find((artifact) => artifact.filename === filename);
 }
 
 export function upsertSpan(spans: TraceSpan[], span: TraceSpan): TraceSpan[] {

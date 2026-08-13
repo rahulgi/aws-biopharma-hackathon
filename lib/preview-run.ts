@@ -81,6 +81,11 @@ Support a balanced scientific exchange concerning **${input.drug}** in **${input
 
 - Which evidence gaps are most relevant to this HCP's patient population?
 - Which results require additional context before they can inform an exchange?`,
+    MSL_DOCUMENT_FILENAME: `${input.drug
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")}-msl-scientific-exchange.html`,
+    MSL_POPULATED_SECTION_COUNT: 6,
     SALES_ANALYSIS: {
       kind: "grounded_report",
       requestId: "preview-sales",
@@ -100,6 +105,11 @@ Give consequential safety information comparable prominence. Preserve the popula
 ## Content to withhold
 
 Exclude unsupported comparative, superiority, access, adherence, and quality-of-life claims until an approved source supports them.`,
+    SALES_DOCUMENT_FILENAME: `${input.drug
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")}-sales-evidence-aid.html`,
+    SALES_POPULATED_SECTION_COUNT: 5,
     SOURCE_MODE: sourceMode,
     SOURCE_COUNT: sourceUrls.length,
     SOURCE_TITLES: sourceTitles,
@@ -122,8 +132,8 @@ Exclude unsupported comparative, superiority, access, adherence, and quality-of-
   };
 }
 
-function previewDocument(input: AgentInput): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${input.drug} Medical Information preview</title><style>body{font:16px/1.6 system-ui;max-width:760px;margin:48px auto;color:#17302f}h1,h2{color:#0d615b}.notice{padding:16px;background:#fff4d6;border:1px solid #edd99b;border-radius:10px}</style></head><body><p class="notice"><strong>Preview data.</strong> This file demonstrates the document handoff and is not a medical response.</p><h1>${input.drug}</h1><p>Medical Information response framework for ${input.indication}.</p><h2>Response scope</h2><p>Populate this fixed template only from the cited Grounded content plan.</p><h2>Source governance</h2><p>Keep labeling, guidelines, and clinical studies distinct through review.</p></body></html>`;
+function previewDocument(input: AgentInput, audience: string): string {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${input.drug} ${audience} preview</title><style>body{font:16px/1.6 system-ui;max-width:760px;margin:48px auto;color:#17302f}h1,h2{color:#0d615b}.notice{padding:16px;background:#fff4d6;border:1px solid #edd99b;border-radius:10px}</style></head><body><p class="notice"><strong>Preview data.</strong> This file demonstrates the document handoff and is not a medical response.</p><h1>${input.drug}</h1><p>${audience} framework for ${input.indication}.</p><h2>Response scope</h2><p>Populate this fixed template only from the cited Grounded content plan.</p><h2>Source governance</h2><p>Keep labeling, guidelines, and clinical studies distinct through review.</p></body></html>`;
 }
 
 type SpanSeed = Pick<TraceSpan, "nodeId" | "label" | "kind">;
@@ -238,21 +248,32 @@ export function previewRunResponse(input: AgentInput): Response {
         });
 
         const output = previewOutput(input);
-        const document = previewDocument(input);
+        const documents = [
+          {
+            filename: output.MEDICAL_INFORMATION_DOCUMENT_FILENAME,
+            content: previewDocument(input, "Medical Information"),
+          },
+          {
+            filename: output.MSL_DOCUMENT_FILENAME,
+            content: previewDocument(input, "MSL scientific exchange"),
+          },
+          {
+            filename: output.SALES_DOCUMENT_FILENAME,
+            content: previewDocument(input, "Sales evidence aid"),
+          },
+        ];
         emit("result", {
           status: "success",
           output: JSON.stringify(output),
           durationMs: cursor,
           costUsd: 0,
           trace,
-          artifacts: [
-            {
-              filename: output.MEDICAL_INFORMATION_DOCUMENT_FILENAME,
-              contentType: "text/html",
-              sizeBytes: Buffer.byteLength(document),
-              contentBase64: Buffer.from(document).toString("base64"),
-            },
-          ],
+          artifacts: documents.map((document) => ({
+            filename: document.filename,
+            contentType: "text/html",
+            sizeBytes: Buffer.byteLength(document.content),
+            contentBase64: Buffer.from(document.content).toString("base64"),
+          })),
           agentVersionId: "preview-version",
           versionLabel: "preview",
         });

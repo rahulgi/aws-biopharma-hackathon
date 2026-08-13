@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { parseApprovedContentOutput, upsertSpan } from "./agent";
+import {
+  artifactByFilename,
+  parseApprovedContentOutput,
+  upsertSpan,
+} from "./agent";
 
 describe("parseApprovedContentOutput", () => {
   it("projects the current agent output contract", () => {
@@ -16,11 +20,15 @@ describe("parseApprovedContentOutput", () => {
           requestId: "msl-report",
         },
         MSL_ANALYSIS_TEXT: "MSL",
+        MSL_DOCUMENT_FILENAME: "msl.html",
+        MSL_POPULATED_SECTION_COUNT: 5,
         SALES_ANALYSIS: {
           kind: "grounded_report",
           requestId: "sales-report",
         },
         SALES_ANALYSIS_TEXT: "Sales",
+        SALES_DOCUMENT_FILENAME: "sales.html",
+        SALES_POPULATED_SECTION_COUNT: 4,
         SOURCE_MODE: "CALLER_SUPPLIED",
         SOURCE_COUNT: 2,
         SOURCE_TITLES: ["Label", "Guideline"],
@@ -36,8 +44,12 @@ describe("parseApprovedContentOutput", () => {
       medicalInformationText: "MI",
       mslReport: { requestId: "msl-report" },
       mslText: "MSL",
+      mslDocumentFilename: "msl.html",
+      mslPopulatedSectionCount: 5,
       salesReport: { requestId: "sales-report" },
       salesText: "Sales",
+      salesDocumentFilename: "sales.html",
+      salesPopulatedSectionCount: 4,
       sourceMode: "CALLER_SUPPLIED",
       sourceCount: 2,
       verifiedSnippetCount: 18,
@@ -57,6 +69,33 @@ describe("parseApprovedContentOutput", () => {
       medicalInformationReport: { requestId: "legacy-medical-report" },
       medicalInformationText: "Legacy MI",
     });
+  });
+});
+
+describe("artifactByFilename", () => {
+  const artifact = (filename: string) => ({
+    filename,
+    contentType: "text/html",
+    sizeBytes: 1,
+    contentBase64: "eA==",
+  });
+
+  it("selects each formatted document by the filename returned for its audience", () => {
+    const artifacts = [
+      artifact("sales.html"),
+      artifact("msl.html"),
+      artifact("medical.html"),
+    ];
+
+    expect(artifactByFilename(artifacts, "medical.html")?.filename).toBe(
+      "medical.html",
+    );
+    expect(artifactByFilename(artifacts, "msl.html")?.filename).toBe(
+      "msl.html",
+    );
+    expect(artifactByFilename(artifacts, "sales.html")?.filename).toBe(
+      "sales.html",
+    );
   });
 });
 
